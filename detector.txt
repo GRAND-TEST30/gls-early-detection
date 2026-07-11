@@ -1,0 +1,9 @@
+maize_gls_detector/
+├── data/                    # Put dataset here
+├── models/                  # Saved trained models
+├── notebooks/               # Jupyter notebooks for experiments
+├── src/
+│   ├── preprocess.py
+│   ├── train.py
+│   ├── inference.py
+│   └── utils.py
