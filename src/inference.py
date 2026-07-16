@@ -1,7 +1,8 @@
 import logging
+import json
 from PIL import Image
-from src.preprocess import GLSEarlyDetector
 from datetime import datetime
+from src.preprocess import GLSEarlyDetector
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -11,10 +12,6 @@ class GLSInferenceEngine:
         self.detector = GLSEarlyDetector()
         logger.info("GLS Inference Engine initialized - Ready for per-image analysis")
 
-    def analyze_image(image_input):
-    detector = GLSEarlyDetector()
-    return detector.full_analysis(image_input)
-
     def validate_image(self, image_input):
         """Validate uploaded image format and size"""
         try:
@@ -23,7 +20,6 @@ class GLSInferenceEngine:
             else:
                 image = Image.open(image_input)
             
-            # Basic validation
             if image.size[0] < 100 or image.size[1] < 100:
                 logger.warning("Image resolution is too low")
                 raise ValueError("Image resolution too low for reliable analysis")
@@ -40,13 +36,9 @@ class GLSInferenceEngine:
         logger.info("=== Starting Full Inference Pipeline ===")
         
         try:
-            # Step 1: Validation
             image = self.validate_image(image_input)
+            result = self.detector.full_analysis(image)
             
-            # Step 2: Full Analysis using Preprocessor
-            result = self.detector.full_per_image_analysis(image)
-            
-            # Step 3: Add metadata
             result["processing_time_seconds"] = round((datetime.now() - start_time).total_seconds(), 2)
             result["image_dimensions"] = image.size
             
@@ -67,26 +59,11 @@ class GLSInferenceEngine:
         GLS EARLY DETECTION REPORT
         =========================
         Analysis Time     : {result.get('analysis_time', 'N/A')}
-        Detected Stage    : {result.get('detected_stage', 'N/A')}
-        Confidence        : {result.get('confidence_score', 0)}%
-        Estimated Lifespan: {result.get('estimated_remaining_productive_days', 0)} days
-        
-        Lesion Statistics:
-        - Total Lesions     : {result.get('lesion_features', {}).get('total_lesions', 0)}
-        - Small Lesions     : {result.get('lesion_features', {}).get('small_lesions', 0)}
-        - Lesion Density    : {result.get('lesion_features', {}).get('lesion_density', 0)} per 10k pixels
+        Detected Stage    : {result.get('stage', 'N/A')}
+        Confidence        : {result.get('confidence', 0)}%
+        Estimated Lifespan: {result.get('remaining_days', 0)} days
         
         Recommendation:
         {result.get('recommendation', 'No recommendation available')}
         """
         return report.strip()
-
-    def save_analysis_log(self, result, filename="analysis_log.json"):
-        """Save analysis result to log file"""
-        try:
-            with open(filename, 'a') as f:
-                json.dump(result, f)
-                f.write("\n")
-            logger.info(f"Analysis log saved to {filename}")
-        except Exception as e:
-            logger.warning(f"Failed to save log: {e}")
