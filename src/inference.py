@@ -12,15 +12,16 @@ class GLSInferenceEngine:
         logger.info("GLS Inference Engine initialized")
 
     def run_full_analysis(self, image_input):
-        """Run analysis - handles both file upload and PIL Image"""
+        """Fixed version - handles PIL Image directly"""
         start_time = datetime.now()
         logger.info("Starting analysis")
 
         try:
-            # Handle both uploaded file and already opened PIL Image
+            # If it's already a PIL Image (from Image.open), use it directly
             if isinstance(image_input, Image.Image):
                 image = image_input
             else:
+                # If it's a file uploader object, open it
                 image = Image.open(image_input)
             
             result = self.detector.full_analysis(image)
@@ -30,6 +31,7 @@ class GLSInferenceEngine:
             
             logger.info("Analysis completed successfully")
             return result
+            
         except Exception as e:
             logger.error(f"Analysis failed: {e}")
             return {
