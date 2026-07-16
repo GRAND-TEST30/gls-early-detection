@@ -9,42 +9,29 @@ logger = logging.getLogger(__name__)
 class GLSInferenceEngine:
     def __init__(self):
         self.detector = GLSEarlyDetector()
-        logger.info("GLS Inference Engine initialized - Ready for per-image analysis")
+        logger.info("GLS Inference Engine initialized")
 
-    def validate_image(self, image_input):
-        """Validate and return PIL Image"""
+    def run_full_analysis(self, image_input):
+        """Run analysis - handles both file and PIL Image"""
+        start_time = datetime.now()
+        logger.info("Starting analysis")
+
         try:
+            # Handle both uploaded file and already opened PIL Image
             if isinstance(image_input, Image.Image):
                 image = image_input
             else:
                 image = Image.open(image_input)
             
-            if image.size[0] < 100 or image.size[1] < 100:
-                logger.warning("Image resolution is too low")
-                raise ValueError("Image resolution too low for reliable analysis")
-            
-            logger.info(f"Image validated: {image.size[0]}x{image.size[1]} pixels")
-            return image
-        except Exception as e:
-            logger.error(f"Image validation failed: {e}")
-            raise ValueError(f"Invalid image: {str(e)}")
-
-    def run_full_analysis(self, image_input):
-        """Run complete analysis pipeline"""
-        start_time = datetime.now()
-        logger.info("=== Starting Full Inference Pipeline ===")
-        
-        try:
-            image = self.validate_image(image_input)
             result = self.detector.full_analysis(image)
             
             result["processing_time_seconds"] = round((datetime.now() - start_time).total_seconds(), 2)
             result["image_dimensions"] = image.size
             
-            logger.info(f"Inference completed successfully")
+            logger.info("Analysis completed successfully")
             return result
         except Exception as e:
-            logger.error(f"Inference failed: {e}")
+            logger.error(f"Analysis failed: {e}")
             return {
                 "status": "Failed",
                 "error_message": str(e),
