@@ -11,6 +11,10 @@ class GLSInferenceEngine:
         self.detector = GLSEarlyDetector()
         logger.info("GLS Inference Engine initialized - Ready for per-image analysis")
 
+    def analyze_image(image_input):
+    detector = GLSEarlyDetector()
+    return detector.full_analysis(image_input)
+
     def validate_image(self, image_input):
         """Validate uploaded image format and size"""
         try:
