@@ -12,7 +12,7 @@ class GLSInferenceEngine:
         logger.info("GLS Inference Engine initialized")
 
     def run_full_analysis(self, image_input):
-        """Run analysis - handles both file and PIL Image"""
+        """Run analysis - handles both file upload and PIL Image"""
         start_time = datetime.now()
         logger.info("Starting analysis")
 
