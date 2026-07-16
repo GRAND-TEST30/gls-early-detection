@@ -1,4 +1,4 @@
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance
 import numpy as np
 
 class GLSEarlyDetector:
@@ -17,13 +17,11 @@ class GLSEarlyDetector:
         return enhancer.enhance(1.8)
 
     def extract_features(self, image):
-        img_array = np.array(image.convert('L'))  # Grayscale
-        # Simple threshold simulation
+        img_array = np.array(image.convert('L'))
         threshold = 170
         lesions = np.sum(img_array < threshold)
         total_pixels = img_array.size
         lesion_ratio = lesions / total_pixels * 100
-        
         return {
             "lesion_ratio": round(lesion_ratio, 2),
             "total_pixels": total_pixels
