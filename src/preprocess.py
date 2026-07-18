@@ -49,12 +49,29 @@ class GLSEarlyDetector:
         stage, confidence, days = self.predict_stage(features)
 
         return {
-            "stage": stage,
-            "confidence": confidence,
-            "remaining_days": days,
-            "recommendation": self.get_recommendation(stage),
-            "lesion_features": features
-        }
+
+    "stage": stage,
+
+    "confidence": confidence,
+
+    "remaining_days": days,
+
+    "recommendation": recommendation,
+
+    "leaf_area": leaf_area,
+
+    "disease_coverage": disease_coverage,
+
+    "colour_features": colour_features,
+
+    "texture_features": texture_features,
+
+    "lesion_features": lesion_features,
+
+    "enhanced_image": enhanced,
+
+    "segmented_image": segmented
+}
 
     def get_recommendation(self, stage):
 
