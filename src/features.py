@@ -1,4 +1,4 @@
-import cv2
+import cv
 import numpy as np
 
 from skimage.feature import graycomatrix
