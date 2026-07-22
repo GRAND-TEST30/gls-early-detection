@@ -54,9 +54,10 @@ with col1:
                 engine = GLSInferenceEngine()
                 result = engine.run_full_analysis(image)  # Pass PIL Image
                 
-                if result.get("status") == "Failed":
-                    st.error(result.get("error_message", "Unknown error"))
-        else:
+            if result.get("status") == "Failed":
+    st.error(result.get("error_message", "Unknown error"))
+
+else:
     st.success("✅ Analysis Completed Successfully!")
 
     #######################################################
