@@ -56,7 +56,7 @@ with col1:
                 
                 if result.get("status") == "Failed":
                     st.error(result.get("error_message", "Unknown error"))
-else:
+        else:
     st.success("✅ Analysis Completed Successfully!")
 
     #######################################################
