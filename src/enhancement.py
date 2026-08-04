@@ -1,3 +1,9 @@
+try:
+    import cv2
+    print("OpenCV imported successfully")
+except Exception as e:
+    raise RuntimeError(f"OpenCV Import Failed: {e}")
+    
 import cv2
 import numpy as np
 from PIL import Image
