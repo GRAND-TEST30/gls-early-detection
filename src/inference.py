@@ -1,5 +1,6 @@
 from datetime import datetime
 from PIL import Image
+import cv2
 
 from src.preprocess import GLSEarlyDetector
 
