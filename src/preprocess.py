@@ -1,5 +1,4 @@
 from PIL import Image
-import numpy as np
 
 from src.enhancement import ImageEnhancer
 from src.segmentation import LeafSegmenter
@@ -14,20 +13,24 @@ class GLSEarlyDetector:
         self.segmenter = LeafSegmenter()
         self.extractor = FeatureExtractor()
 
-    ###########################################################
+    # =========================================================
     # LOAD IMAGE
-    ###########################################################
+    # =========================================================
 
     def load_image(self, image_input):
+        """
+        Load image from a PIL Image or file path.
+        Always return RGB PIL Image.
+        """
 
         if isinstance(image_input, Image.Image):
             return image_input.convert("RGB")
 
         return Image.open(image_input).convert("RGB")
 
-    ###########################################################
+    # =========================================================
     # HEALTH SCORE
-    ###########################################################
+    # =========================================================
 
     def calculate_health_score(
         self,
@@ -36,58 +39,138 @@ class GLSEarlyDetector:
         mean_green
     ):
         """
-        Calculate overall leaf health score (0–100)
+        Calculate an overall leaf health score from 0–100.
+
+        Higher disease coverage and lesion count reduce
+        the health score.
+
+        Higher green intensity can slightly improve the score.
         """
 
-        score = 100
+        score = 100.0
 
+        # -----------------------------------------------------
         # Disease coverage penalty
-        score -= disease_coverage * 2
+        # -----------------------------------------------------
 
+        score -= disease_coverage * 2.0
+
+        # -----------------------------------------------------
         # Lesion count penalty
+        # -----------------------------------------------------
+
         score -= lesion_count * 1.2
 
-        # Green intensity bonus
+        # -----------------------------------------------------
+        # Green intensity adjustment
+        # -----------------------------------------------------
+
         if mean_green > 140:
+
             score += 5
+
         elif mean_green > 120:
+
             score += 2
 
-        score = max(0, min(100, score))
+        # -----------------------------------------------------
+        # Keep score between 0 and 100
+        # -----------------------------------------------------
 
-        return round(score, 1)
+        score = max(
+            0,
+            min(
+                100,
+                score
+            )
+        )
 
-    ###########################################################
+        return round(
+            score,
+            1
+        )
+
+    # =========================================================
     # STAGE PREDICTION
-    ###########################################################
+    # =========================================================
 
     def predict_stage(
         self,
         disease_coverage,
         lesion_count
     ):
+        """
+        Estimate disease stage using the extracted
+        lesion characteristics.
 
-        if disease_coverage < 2 and lesion_count < 5:
+        NOTE:
+        This is currently rule-based and not a trained
+        machine-learning classifier.
+        """
 
-            return "Healthy", 96, 90
+        # -----------------------------------------------------
+        # Healthy
+        # -----------------------------------------------------
+
+        if (
+            disease_coverage < 2
+            and lesion_count < 5
+        ):
+
+            return (
+                "Healthy",
+                96,
+                90
+            )
+
+        # -----------------------------------------------------
+        # Early Stage
+        # -----------------------------------------------------
 
         elif disease_coverage < 8:
 
-            return "Early Stage", 91, 55
+            return (
+                "Early Stage",
+                91,
+                55
+            )
+
+        # -----------------------------------------------------
+        # Moderate Stage
+        # -----------------------------------------------------
 
         elif disease_coverage < 18:
 
-            return "Moderate Stage", 84, 28
+            return (
+                "Moderate Stage",
+                84,
+                28
+            )
+
+        # -----------------------------------------------------
+        # Severe Stage
+        # -----------------------------------------------------
 
         else:
 
-            return "Severe Stage", 76, 10
+            return (
+                "Severe Stage",
+                76,
+                10
+            )
 
-    ###########################################################
+    # =========================================================
     # RECOMMENDATION
-    ###########################################################
+    # =========================================================
 
-    def get_recommendation(self, stage):
+    def get_recommendation(
+        self,
+        stage
+    ):
+        """
+        Generate a recommendation according to
+        the estimated disease stage.
+        """
 
         if stage == "Healthy":
 
@@ -125,128 +208,279 @@ class GLSEarlyDetector:
                 "• Assess possible yield loss."
             )
 
-    ###########################################################
+    # =========================================================
     # COMPLETE ANALYSIS
-    ###########################################################
+    # =========================================================
 
-    def full_analysis(self, image_input):
+    def full_analysis(
+        self,
+        image_input
+    ):
+        """
+        Perform complete per-image Gray Leaf Spot analysis.
 
-        #######################################################
-        # Load
-        #######################################################
+        Pipeline:
 
-        image = self.load_image(image_input)
+        Image
+          ↓
+        Enhancement
+          ↓
+        Leaf Segmentation
+          ↓
+        Leaf Mask
+          ↓
+        Colour Analysis
+        Texture Analysis
+        Lesion Detection
+          ↓
+        Disease Coverage
+          ↓
+        Health Score
+          ↓
+        Stage Prediction
+          ↓
+        Recommendation
+        """
 
-        #######################################################
-        # Enhancement
-        #######################################################
+        # =====================================================
+        # 1. LOAD IMAGE
+        # =====================================================
 
-        enhanced = self.enhancer.enhance(image)
+        image = self.load_image(
+            image_input
+        )
 
-        #######################################################
-        # Segmentation
-        #######################################################
+        # =====================================================
+        # 2. IMAGE INFORMATION
+        # =====================================================
 
-        segmented, mask = self.segmenter.segment_leaf(enhanced)
+        width, height = image.size
 
-        leaf_area = self.segmenter.calculate_leaf_area(mask)
+        image_pixels = (
+            width * height
+        )
 
-        #######################################################
-        # Feature Extraction
-        #######################################################
-
-        all_features = self.extractor.extract_all(segmented)
-
-        #######################################################
-        # Split Features
-        #######################################################
-
-        colour_features = {
-
-            "mean_red": all_features["mean_red"],
-            "mean_green": all_features["mean_green"],
-            "mean_blue": all_features["mean_blue"],
-            "mean_hue": all_features["mean_hue"],
-            "mean_saturation": all_features["mean_saturation"],
-            "mean_value": all_features["mean_value"]
-
+        image_dimensions = {
+            "width": int(width),
+            "height": int(height)
         }
 
-        texture_features = {
+        # =====================================================
+        # 3. IMAGE ENHANCEMENT
+        # =====================================================
 
-            "contrast": all_features["contrast"],
-            "homogeneity": all_features["homogeneity"],
-            "energy": all_features["energy"],
-            "correlation": all_features["correlation"],
-            "ASM": all_features["ASM"]
+        enhanced = self.enhancer.enhance(
+            image
+        )
 
-        }
+        # =====================================================
+        # 4. LEAF SEGMENTATION
+        # =====================================================
 
-        lesion_features = {
+        segmented, mask = (
+            self.segmenter.segment_leaf(
+                enhanced
+            )
+        )
 
-            "lesion_count": all_features["lesion_count"],
-            "largest_lesion": all_features["largest_lesion"],
-            "total_lesion_area": all_features["total_lesion_area"]
+        # =====================================================
+        # 5. LEAF AREA
+        # =====================================================
 
-        }
+        leaf_area = (
+            self.segmenter.calculate_leaf_area(
+                mask
+            )
+        )
 
-        #######################################################
-        # Disease Coverage
-        #######################################################
+        # =====================================================
+        # 6. LEAF COVERAGE
+        # =====================================================
 
-        lesion_area = lesion_features["total_lesion_area"]
+        leaf_coverage = (
+            self.segmenter.calculate_leaf_coverage(
+                mask
+            )
+        )
 
-        if leaf_area == 0:
+        # =====================================================
+        # 7. FEATURE EXTRACTION
+        # =====================================================
+        #
+        # IMPORTANT:
+        # We pass the ENHANCED image together with the
+        # LEAF MASK.
+        #
+        # We do NOT pass the black-background segmented
+        # image because that can cause the background to
+        # be interpreted as lesions.
+        # =====================================================
 
-            disease_coverage = 0
+        all_features = (
+            self.extractor.extract_all(
+                enhanced,
+                mask
+            )
+        )
+
+        # =====================================================
+        # 8. FEATURE GROUPS
+        # =====================================================
+
+        colour_features = (
+            all_features.get(
+                "colour_features",
+                {}
+            )
+        )
+
+        texture_features = (
+            all_features.get(
+                "texture_features",
+                {}
+            )
+        )
+
+        lesion_features = (
+            all_features.get(
+                "lesion_features",
+                {}
+            )
+        )
+
+        # =====================================================
+        # 9. LESION INFORMATION
+        # =====================================================
+
+        lesion_count = int(
+            lesion_features.get(
+                "lesion_count",
+                0
+            )
+        )
+
+        largest_lesion = float(
+            lesion_features.get(
+                "largest_lesion",
+                0
+            )
+        )
+
+        total_lesion_area = float(
+            lesion_features.get(
+                "total_lesion_area",
+                0
+            )
+        )
+
+        # =====================================================
+        # 10. DISEASE COVERAGE
+        # =====================================================
+        #
+        # Disease coverage is based on lesion area relative
+        # to the detected leaf area.
+        #
+        # It is also bounded between 0 and 100%.
+        # =====================================================
+
+        if leaf_area > 0:
+
+            disease_coverage = (
+                total_lesion_area /
+                leaf_area
+            ) * 100
 
         else:
 
-            disease_coverage = (
-                lesion_area / leaf_area
-            ) * 100
+            disease_coverage = 0.0
 
-        #######################################################
-        # Health Score
-        #######################################################
+        # -----------------------------------------------------
+        # Safety protection
+        # -----------------------------------------------------
 
-        health_score = self.calculate_health_score(
-
-            disease_coverage,
-
-            lesion_features["lesion_count"],
-
-            colour_features["mean_green"]
-
+        disease_coverage = max(
+            0.0,
+            min(
+                100.0,
+                disease_coverage
+            )
         )
 
-        #######################################################
-        # Stage Prediction
-        #######################################################
-
-        stage, confidence, remaining_days = self.predict_stage(
-
+        disease_coverage = round(
             disease_coverage,
-
-            lesion_features["lesion_count"]
-
+            2
         )
 
-        #######################################################
-        # Recommendation
-        #######################################################
+        # =====================================================
+        # 11. LESION RATIO
+        # =====================================================
 
-        recommendation = self.get_recommendation(stage)
+        lesion_ratio = disease_coverage
 
-        #######################################################
-        # Return Everything
-        #######################################################
+        # Make sure the nested lesion dictionary contains
+        # the final calculated values.
+
+        lesion_features[
+            "lesion_ratio"
+        ] = lesion_ratio
+
+        lesion_features[
+            "disease_coverage"
+        ] = disease_coverage
+
+        # =====================================================
+        # 12. GREEN VALUE
+        # =====================================================
+
+        mean_green = float(
+            colour_features.get(
+                "mean_green",
+                0
+            )
+        )
+
+        # =====================================================
+        # 13. HEALTH SCORE
+        # =====================================================
+
+        health_score = (
+            self.calculate_health_score(
+                disease_coverage,
+                lesion_count,
+                mean_green
+            )
+        )
+
+        # =====================================================
+        # 14. STAGE PREDICTION
+        # =====================================================
+
+        stage, confidence, remaining_days = (
+            self.predict_stage(
+                disease_coverage,
+                lesion_count
+            )
+        )
+
+        # =====================================================
+        # 15. RECOMMENDATION
+        # =====================================================
+
+        recommendation = (
+            self.get_recommendation(
+                stage
+            )
+        )
+
+        # =====================================================
+        # 16. RETURN COMPLETE ANALYSIS
+        # =====================================================
 
         return {
 
-            ###################################################
-            # Prediction
-            ###################################################
+            # -------------------------------------------------
+            # DISEASE ASSESSMENT
+            # -------------------------------------------------
 
             "stage": stage,
 
@@ -254,37 +488,51 @@ class GLSEarlyDetector:
 
             "remaining_days": remaining_days,
 
+            "health_score": health_score,
+
             "recommendation": recommendation,
 
-            ###################################################
-            # Statistics
-            ###################################################
+            # -------------------------------------------------
+            # IMAGE INFORMATION
+            # -------------------------------------------------
+
+            "image_dimensions": image_dimensions,
+
+            "image_pixels": image_pixels,
+
+            # -------------------------------------------------
+            # LEAF INFORMATION
+            # -------------------------------------------------
 
             "leaf_area": leaf_area,
 
-            "disease_coverage": round(
-                disease_coverage,
-                2
-            ),
+            "leaf_coverage": leaf_coverage,
 
-            "health_score": health_score,
+            "disease_coverage": disease_coverage,
 
-            ###################################################
-            # Feature Groups
-            ###################################################
+            # -------------------------------------------------
+            # COLOUR FEATURES
+            # -------------------------------------------------
 
             "colour_features": colour_features,
 
+            # -------------------------------------------------
+            # TEXTURE FEATURES
+            # -------------------------------------------------
+
             "texture_features": texture_features,
+
+            # -------------------------------------------------
+            # LESION FEATURES
+            # -------------------------------------------------
 
             "lesion_features": lesion_features,
 
-            ###################################################
-            # Images
-            ###################################################
+            # -------------------------------------------------
+            # PROCESSED IMAGES
+            # -------------------------------------------------
 
             "enhanced_image": enhanced,
 
             "segmented_image": segmented
-
         }
