@@ -3,207 +3,241 @@ import numpy as np
 from PIL import Image
 
 
-class LeafSegmenter:
+class ImageEnhancer:
 
     def __init__(self):
-        pass
-
-    # =========================================================
-    # SEGMENT LEAF
-    # =========================================================
-
-    def segment_leaf(self, image):
         """
-        Segment the maize leaf from the surrounding background.
+        Initialize the image enhancement module.
 
-        Returns:
-            segmented_image: PIL Image
-            mask: binary NumPy array
+        Enhancement pipeline:
+        1. LAB colour-space conversion
+        2. CLAHE contrast enhancement
+        3. Non-local means noise reduction
+        4. Edge-preserving sharpening
         """
 
-        # Convert PIL image to RGB NumPy array
-        img = np.array(image.convert("RGB"))
+        # CLAHE configuration
+        self.clahe = cv2.createCLAHE(
+            clipLimit=2.5,
+            tileGridSize=(8, 8)
+        )
 
-        # Convert RGB to HSV
-        hsv = cv2.cvtColor(
+        # Sharpening kernel
+        self.sharpen_kernel = np.array(
+            [
+                [0, -1, 0],
+                [-1, 5, -1],
+                [0, -1, 0]
+            ],
+            dtype=np.float32
+        )
+
+    # =========================================================
+    # IMAGE VALIDATION
+    # =========================================================
+
+    def _prepare_image(self, image):
+        """
+        Convert input image into a valid RGB uint8 NumPy array.
+        """
+
+        if isinstance(image, Image.Image):
+
+            image = image.convert("RGB")
+
+            img = np.array(image)
+
+        else:
+
+            img = np.asarray(image)
+
+            if img.ndim == 2:
+
+                img = cv2.cvtColor(
+                    img,
+                    cv2.COLOR_GRAY2RGB
+                )
+
+            elif img.ndim == 3 and img.shape[2] == 4:
+
+                img = cv2.cvtColor(
+                    img,
+                    cv2.COLOR_RGBA2RGB
+                )
+
+        # Ensure uint8 representation
+        if img.dtype != np.uint8:
+
+            img = np.clip(
+                img,
+                0,
+                255
+            ).astype(np.uint8)
+
+        return img
+
+    # =========================================================
+    # CLAHE ENHANCEMENT
+    # =========================================================
+
+    def _apply_clahe(self, img):
+        """
+        Enhance local contrast using CLAHE.
+
+        CLAHE operates on the L channel of LAB,
+        preserving the original colour information
+        better than applying contrast directly to RGB.
+        """
+
+        lab = cv2.cvtColor(
             img,
-            cv2.COLOR_RGB2HSV
+            cv2.COLOR_RGB2LAB
         )
 
-        # -----------------------------------------------------
-        # GREEN MASK
-        # -----------------------------------------------------
-
-        lower_green = np.array(
-            [20, 25, 20],
-            dtype=np.uint8
+        l_channel, a_channel, b_channel = cv2.split(
+            lab
         )
 
-        upper_green = np.array(
-            [95, 255, 255],
-            dtype=np.uint8
+        enhanced_l = self.clahe.apply(
+            l_channel
         )
 
-        green_mask = cv2.inRange(
-            hsv,
-            lower_green,
-            upper_green
+        enhanced_lab = cv2.merge(
+            (
+                enhanced_l,
+                a_channel,
+                b_channel
+            )
         )
 
-        # -----------------------------------------------------
-        # ADDITIONAL VEGETATION MASK
-        # -----------------------------------------------------
-
-        # Exclude extremely dark pixels
-        brightness_mask = hsv[:, :, 2] > 25
-
-        # Combine masks
-        mask = green_mask.copy()
-
-        mask[~brightness_mask] = 0
-
-        # -----------------------------------------------------
-        # MORPHOLOGICAL CLEANING
-        # -----------------------------------------------------
-
-        kernel = np.ones(
-            (5, 5),
-            np.uint8
+        enhanced = cv2.cvtColor(
+            enhanced_lab,
+            cv2.COLOR_LAB2RGB
         )
 
-        mask = cv2.morphologyEx(
-            mask,
-            cv2.MORPH_OPEN,
-            kernel
-        )
+        return enhanced
 
-        mask = cv2.morphologyEx(
-            mask,
-            cv2.MORPH_CLOSE,
-            kernel
-        )
+    # =========================================================
+    # NOISE REDUCTION
+    # =========================================================
 
-        # -----------------------------------------------------
-        # KEEP MAJOR LEAF COMPONENTS
-        # -----------------------------------------------------
+    def _reduce_noise(self, img):
+        """
+        Reduce image noise using Non-Local Means denoising.
 
-        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(
-            mask,
-            connectivity=8
-        )
+        This is useful for reducing small image artifacts
+        before lesion detection.
+        """
 
-        if num_labels > 1:
-
-            # Ignore background label 0
-            component_areas = stats[1:, cv2.CC_STAT_AREA]
-
-            largest_index = np.argmax(
-                component_areas
-            ) + 1
-
-            # Create clean mask
-            clean_mask = np.zeros_like(mask)
-
-            clean_mask[
-                labels == largest_index
-            ] = 255
-
-            mask = clean_mask
-
-        # -----------------------------------------------------
-        # FINAL MORPHOLOGICAL CLEANING
-        # -----------------------------------------------------
-
-        mask = cv2.morphologyEx(
-            mask,
-            cv2.MORPH_CLOSE,
-            kernel
-        )
-
-        # -----------------------------------------------------
-        # CREATE SEGMENTED IMAGE
-        # -----------------------------------------------------
-
-        segmented = cv2.bitwise_and(
+        denoised = cv2.fastNlMeansDenoisingColored(
             img,
+            None,
+            10,
+            10,
+            7,
+            21
+        )
+
+        return denoised
+
+    # =========================================================
+    # SHARPENING
+    # =========================================================
+
+    def _sharpen(self, img):
+        """
+        Enhance edges and fine structures that may
+        correspond to disease lesions.
+        """
+
+        sharpened = cv2.filter2D(
             img,
-            mask=mask
+            -1,
+            self.sharpen_kernel
         )
 
-        segmented_image = Image.fromarray(
-            segmented
-        )
-
-        return segmented_image, mask
+        return sharpened
 
     # =========================================================
-    # LEAF AREA
+    # COMPLETE ENHANCEMENT PIPELINE
     # =========================================================
 
-    def calculate_leaf_area(self, mask):
+    def enhance(self, image):
         """
-        Calculate number of pixels belonging to the leaf.
+        Perform complete image enhancement.
+
+        Pipeline:
+
+            Input
+              ↓
+            RGB validation
+              ↓
+            LAB conversion
+              ↓
+            CLAHE
+              ↓
+            Noise reduction
+              ↓
+            Sharpening
+              ↓
+            Enhanced PIL Image
         """
 
-        if mask is None:
-            return 0
+        # -----------------------------------------------------
+        # Prepare image
+        # -----------------------------------------------------
 
-        leaf_pixels = np.sum(
-            mask > 0
+        img = self._prepare_image(
+            image
         )
 
-        return int(leaf_pixels)
+        # -----------------------------------------------------
+        # CLAHE
+        # -----------------------------------------------------
 
-    # =========================================================
-    # LEAF COVERAGE
-    # =========================================================
-
-    def calculate_leaf_coverage(self, mask):
-        """
-        Calculate percentage of the image occupied by the leaf.
-        """
-
-        if mask is None:
-            return 0.0
-
-        total_pixels = mask.size
-
-        if total_pixels == 0:
-            return 0.0
-
-        leaf_pixels = np.sum(
-            mask > 0
+        enhanced = self._apply_clahe(
+            img
         )
 
-        coverage = (
-            leaf_pixels /
-            total_pixels
-        ) * 100
+        # -----------------------------------------------------
+        # Noise reduction
+        # -----------------------------------------------------
 
-        return round(
-            float(coverage),
-            2
+        enhanced = self._reduce_noise(
+            enhanced
         )
 
-    # =========================================================
-    # APPLY MASK
-    # =========================================================
+        # -----------------------------------------------------
+        # Sharpening
+        # -----------------------------------------------------
 
-    def apply_mask(self, image, mask):
-        """
-        Apply a leaf mask to an image.
-        """
-
-        img = np.array(
-            image.convert("RGB")
+        enhanced = self._sharpen(
+            enhanced
         )
 
-        masked = cv2.bitwise_and(
-            img,
-            img,
-            mask=mask
-        )
+        # -----------------------------------------------------
+        # Convert back to PIL
+        # -----------------------------------------------------
 
         return Image.fromarray(
-            masked
+            enhanced
+        )
+
+    # =========================================================
+    # OPTIONAL NUMPY OUTPUT
+    # =========================================================
+
+    def enhance_array(self, image):
+        """
+        Return the enhanced image as a NumPy array.
+
+        Useful for OpenCV-based downstream processing.
+        """
+
+        enhanced = self.enhance(
+            image
+        )
+
+        return np.array(
+            enhanced
         )
